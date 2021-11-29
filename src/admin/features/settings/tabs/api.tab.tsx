@@ -5,11 +5,11 @@ import { BackupContextProvider } from '@admin/features/backup/context/backup.con
 import BackupCommandBar from '@admin/features/backup/components/backup-command-bar';
 import BackupList from '@admin/features/backup/components/backup-list';
 
-const BackupSettings = () => {
+const ApiSettings = () => {
   return (
     <div>
-      <Heading title="Backups" noPadding>
-        Create and manage backups.
+      <Heading title="Access Tokens" noPadding>
+        Generate and delete access tokens which are used
       </Heading>
       <BackupCommandBar />
       <BackupList />
@@ -19,4 +19,4 @@ const BackupSettings = () => {
 
 export default composeWrappers({
   backupContext: BackupContextProvider,
-})(BackupSettings);
+})(ApiSettings);

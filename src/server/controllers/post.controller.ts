@@ -12,15 +12,17 @@ import logger from '@shared/features/logger';
 import Tag from '@server/models/tag.model';
 import { IPost, IUser } from '@shared/interfaces/model';
 import {
+  getEnhancedRepository,
   getReplaceChildrenQuery,
   updateMeta
 } from '@server/common/orm-helpers';
 import { v4 as uuidv4 } from 'uuid';
 import { mapPost, mapPostWithMeta } from '@server/common/mappers';
-import { compilePost, retrievePostAndCompile } from '@server/common/post.utility';
+import { buildPath, compilePost, publishedQuery, retrievePostAndCompile } from '@server/common/post.utility';
 import { sign, verify } from '@server/common/jwt';
 import Hooks from '@shared/features/hooks';
 import queryString from 'query-string';
+import SiteSettings from '@server/models/site-settings.model';
 
 const app = express();
 
@@ -702,26 +704,50 @@ app.get(
     const id = req?.params?.postId;
     const {versionId} = req?.query;
     const postRepository = getRepository(Post);
-    const post = await postRepository.findOne({id});
+    const settingsRepository = getRepository(SiteSettings);
+
+    const where = {id};
+    if (versionId) {
+      where.id = versionId;
+    }
+
+    const post = await postRepository.findOne(where);
     if (!post) throw new BadRequestError('invalid_post');
 
-    const token = sign({
-      postId: post.id,
-      userId: req?.data?.user?.id,
-    }, process.env.PREVIEW_TOKEN_EXPIRES || 1800);
-
-    const data = await Hooks.applyFilters('posts/preview/data', {
-      post,
-      data: {
-        baseUrl: process.env.PREVIEW_BASE_URL,
-        token
-      },
-      src: `${process.env.PREVIEW_BASE_URL}/${post?.slugPath}?${queryString.stringify({versionId, token})}`
+    const previewSettings = await settingsRepository.findOne({
+      where: {
+        key: 'previewEditor'
+      }
     });
 
-    return res.send(data);
+    if (!previewSettings) throw new BadRequestError('configuration_missing');
+    let rewrites = [];
+    try {
+      const parsed = JSON.parse(previewSettings?.value);
+      rewrites = JSON.parse(parsed?.rewrites);
+    } catch {
+      throw new BadRequestError('configuration_invalid');
+    }
+
+    return res.send({
+      src: buildPath(post?.slugPath, rewrites as any)
+    });
   })
 )
+
+app.get('/sitemap', asyncMiddleware(async (req, res) => {
+  const postRepository = getEnhancedRepository(Post);
+  const query = postRepository.createQueryBuilder('post');
+
+  publishedQuery(query);
+
+  query.andWhere('post.type IN (:...types)', {
+    types: ['hierarchical_post','post','page']
+  });
+
+  const posts = await query.getMany();
+  res.send(posts);
+}))
 
 app.get(
   '/content/*',
