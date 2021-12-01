@@ -17,7 +17,7 @@ export default class AccessToken extends BaseEntity implements IAccessToken {
   token: string;
 
   @Column({type: 'text', nullable: true})
-  description: any;
+  name: any;
 
   @CreateDateColumn()
   createdAt: Date;

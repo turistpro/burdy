@@ -14,30 +14,42 @@ import { IPost, IUser } from '@shared/interfaces/model';
 import {
   getEnhancedRepository,
   getReplaceChildrenQuery,
-  updateMeta
+  updateMeta,
 } from '@server/common/orm-helpers';
 import { v4 as uuidv4 } from 'uuid';
 import { mapPost, mapPostWithMeta } from '@server/common/mappers';
-import { buildPath, compilePost, publishedQuery, retrievePostAndCompile } from '@server/common/post.utility';
+import {
+  buildPath,
+  compilePost,
+  publishedQuery,
+  retrievePostAndCompile,
+} from '@server/common/post.utility';
 import { sign, verify } from '@server/common/jwt';
 import Hooks from '@shared/features/hooks';
 import queryString from 'query-string';
 import SiteSettings from '@server/models/site-settings.model';
+import contentMiddleware from '@server/middleware/content.middleware';
 
 const app = express();
 
 export const isPostPublished = (post?: IPost) => {
   if (post?.status === 'published') {
-    if (post?.publishedFrom && isBefore(new Date(), new Date(post?.publishedFrom))) {
+    if (
+      post?.publishedFrom &&
+      isBefore(new Date(), new Date(post?.publishedFrom))
+    ) {
       return false;
     }
-    if (post?.publishedUntil && isAfter(new Date(), new Date(post?.publishedUntil))) {
+    if (
+      post?.publishedUntil &&
+      isAfter(new Date(), new Date(post?.publishedUntil))
+    ) {
       return false;
     }
     return true;
   }
   return false;
-}
+};
 
 export const createPostVersion = async (
   postRepository: Repository<Post>,
@@ -52,11 +64,11 @@ export const createPostVersion = async (
     contentType: post.contentType,
     meta: (post.meta || []).map((meta) => ({
       key: meta?.key,
-      value: meta?.value
+      value: meta?.value,
     })),
     tags: post.tags,
     author,
-    parent: post
+    parent: post,
   });
   return postVersion;
 };
@@ -83,42 +95,42 @@ app.get(
       .leftJoinAndSelect('post.tags', 'tags')
       .leftJoinAndSelect('author.meta', 'author.meta')
       .where('post.type != :postVersion', {
-        postVersion: 'post_version'
+        postVersion: 'post_version',
       });
 
     if (id) {
       qb.andWhere('post.id IN (:...ids)', {
-        ids: (id as string).split(',')
+        ids: (id as string).split(','),
       });
     }
 
     if (slug) {
       qb.andWhere('post.slugPath IN (:...slugPaths)', {
         slugPaths: (slug as string).split(','),
-      })
+      });
     }
 
     if (type) {
       qb.andWhere('post.type IN (:...types)', {
-        types: (type as string).split(',')
+        types: (type as string).split(','),
       });
     }
 
     if (contentTypeId) {
       qb.andWhere('post.contentTypeId IN (:...ids)', {
-        ids: (contentTypeId as string).split(',')
+        ids: (contentTypeId as string).split(','),
       });
     }
 
     if (contentTypeName) {
       qb.andWhere('contentType.name IN (:...name)', {
-        name: (contentTypeName as string).split(',')
+        name: (contentTypeName as string).split(','),
       });
     }
 
     if (parentId && !onlyOrphans) {
       qb.andWhere('post.parentId IN (:...parentIds)', {
-        parentIds: (parentId as string).split(',')
+        parentIds: (parentId as string).split(','),
       });
     }
 
@@ -131,10 +143,10 @@ app.get(
         new Brackets((subQb) => {
           subQb
             .where('LOWER(post.name) LIKE :search', {
-              search: `%${(search as string).toLowerCase()}%`
+              search: `%${(search as string).toLowerCase()}%`,
             })
             .orWhere('LOWER(post.slugPath) LIKE :search', {
-              search: `%${(search as string).toLowerCase()}%`
+              search: `%${(search as string).toLowerCase()}%`,
             });
         })
       );
@@ -153,7 +165,7 @@ app.post(
     await req.validate(
       {
         slug: yup.string().max(256).required(),
-        name: yup.string().max(256).required()
+        name: yup.string().max(256).required(),
       },
       'body'
     );
@@ -168,7 +180,7 @@ app.post(
         let parent;
         if (params.parentId) {
           parent = await transactionManager.findOne(Post, {
-            id: params.parentId
+            id: params.parentId,
           });
           if (!parent) throw new BadRequestError('invalid_parent');
         }
@@ -178,15 +190,18 @@ app.post(
           contentType = await transactionManager.findOne(ContentType, {
             where: {
               id: params.contentTypeId,
-              type: In(['post', 'page', 'fragment'])
-            }
+              type: In(['post', 'page', 'fragment']),
+            },
           });
           if (!contentType) throw new BadRequestError('invalid_content_type');
         }
 
         let meta = [];
         if (params.meta) {
-          meta = Object.entries(params.meta).map(([key, value]) => ({ key, value }));
+          meta = Object.entries(params.meta).map(([key, value]) => ({
+            key,
+            value,
+          }));
         }
 
         const postObj: Partial<IPost> = {
@@ -195,10 +210,10 @@ app.post(
           type: params?.type || 'post',
           contentType,
           author: req?.data?.user,
-          meta
+          meta,
         };
 
-        if(postObj.type === 'folder') {
+        if (postObj.type === 'folder') {
           postObj.status = 'published';
         }
 
@@ -215,7 +230,7 @@ app.post(
       logger.error({
         type: 'post',
         message: 'error saving post',
-        data: err.toString()
+        data: err.toString(),
       });
       if (err?.code === '23505') {
         throw new BadRequestError('duplicate_slug');
@@ -233,7 +248,7 @@ app.post(
     await req.validate(
       {
         slug: yup.string().max(256).required(),
-        name: yup.string().max(256).required()
+        name: yup.string().max(256).required(),
       },
       'body'
     );
@@ -248,7 +263,7 @@ app.post(
         let parent;
         if (parentId) {
           parent = await transactionManager.findOne(Post, {
-            id: parentId
+            id: parentId,
           });
           if (!parent) throw new BadRequestError('invalid_parent');
         }
@@ -256,41 +271,53 @@ app.post(
         const sourcePost = await transactionManager.findOne(Post, {
           relations: ['meta', 'contentType', 'parent'],
           where: {
-            id: postId
-          }
+            id: postId,
+          },
         });
         if (!sourcePost) throw new BadRequestError('invalid_source');
 
         let children: any = [sourcePost];
         if (recursive) {
-          children = await transactionManager.getRepository(Post)
+          children = await transactionManager
+            .getRepository(Post)
             .createQueryBuilder('post')
             .leftJoinAndSelect('post.contentType', 'contentType')
             .leftJoinAndSelect('post.meta', 'meta')
             .leftJoinAndSelect('post.tags', 'tags')
             .where('post.type IN (:...types)', {
-              types: ['folder', 'page', 'fragment', 'post', 'hierarchical_post']
+              types: [
+                'folder',
+                'page',
+                'fragment',
+                'post',
+                'hierarchical_post',
+              ],
             })
-            .andWhere(new Brackets((subQb) => {
-              subQb
-                .where('post.slugPath = :slugPath1', {
-                  slugPath1: sourcePost.slugPath
-                })
-                .orWhere('post.slugPath LIKE :slugPath2', {
-                  slugPath2: `${sourcePost.slugPath}/%`
-                });
-            })).addOrderBy('post.slugPath', 'ASC').getMany();
+            .andWhere(
+              new Brackets((subQb) => {
+                subQb
+                  .where('post.slugPath = :slugPath1', {
+                    slugPath1: sourcePost.slugPath,
+                  })
+                  .orWhere('post.slugPath LIKE :slugPath2', {
+                    slugPath2: `${sourcePost.slugPath}/%`,
+                  });
+              })
+            )
+            .addOrderBy('post.slugPath', 'ASC')
+            .getMany();
         }
 
         const getSlugPath = (child) => {
-          const newKey =
-            `${parent ? `${parent?.slugPath}/` : ''}${slug}${child.slugPath.slice(sourcePost?.slugPath?.length || 0)}`;
+          const newKey = `${
+            parent ? `${parent?.slugPath}/` : ''
+          }${slug}${child.slugPath.slice(sourcePost?.slugPath?.length || 0)}`;
           return newKey;
         };
         const getParent = (child, slugPath) => {
           const components = slugPath.split('/');
           components.pop();
-          return posts.find(post => post.slugPath === components.join('/'));
+          return posts.find((post) => post.slugPath === components.join('/'));
         };
         await children.reduce(async (promise, child) => {
           await promise;
@@ -303,11 +330,12 @@ app.post(
             contentType: child?.contentType,
             meta: (child.meta || []).map((meta) => ({
               key: meta?.key,
-              value: meta?.value
+              value: meta?.value,
             })),
-            parent: sourcePost.id === child.id ? parent : getParent(child, slugPath),
+            parent:
+              sourcePost.id === child.id ? parent : getParent(child, slugPath),
             tags: child.tags,
-            author: req?.data?.user
+            author: req?.data?.user,
           };
           const post = await transactionManager.save(Post, postObj);
           posts.push(post);
@@ -317,11 +345,11 @@ app.post(
       logger.error({
         type: 'post',
         message: 'error saving post',
-        data: err.toString()
+        data: err.toString(),
       });
       throw new BadRequestError('duplicate_slug');
     }
-    return res.send(posts.map(post => mapPost(post)));
+    return res.send(posts.map((post) => mapPost(post)));
   })
 );
 
@@ -334,7 +362,7 @@ app.delete(
 
     const postRepository = getRepository(Post);
     const deleted = await postRepository.delete({
-      id: In(ids)
+      id: In(ids),
     });
 
     return res.send(deleted);
@@ -358,11 +386,11 @@ app.put(
             'author',
             'author.meta',
             'parent',
-            'tags'
+            'tags',
           ],
           where: {
-            id: req.params.postId
-          }
+            id: req.params.postId,
+          },
         });
         if (!post) throw new BadRequestError('invalid_post');
 
@@ -380,7 +408,7 @@ app.put(
           post,
           Object.keys(flat).map((key) => ({
             key: `content.${key}`,
-            value: flat[key]
+            value: flat[key],
           })),
           /^content/
         );
@@ -397,7 +425,7 @@ app.put(
       logger.error({
         type: 'post',
         message: 'error saving post content',
-        data: err.toString()
+        data: err.toString(),
       });
       throw err;
     }
@@ -413,57 +441,67 @@ app.put(
     const { publish, recursive, ids, publishedFrom, publishedUntil } = req.body;
     const entityManager = getManager();
     try {
-      const result = await entityManager.transaction(async (transactionManager) => {
-        const postRepository = transactionManager.getRepository(Post);
-        const postTreeRepository = transactionManager.getTreeRepository(Post);
+      const result = await entityManager.transaction(
+        async (transactionManager) => {
+          const postRepository = transactionManager.getRepository(Post);
+          const postTreeRepository = transactionManager.getTreeRepository(Post);
 
-        let posts = await postRepository.findByIds(ids);
-        if (!(posts?.length > 0)) throw new BadRequestError('invalid_ids');
+          let posts = await postRepository.findByIds(ids);
+          if (!(posts?.length > 0)) throw new BadRequestError('invalid_ids');
 
-        const qb = postRepository.createQueryBuilder('post').update(Post);
-        if (publish) {
-          qb.set({
-            publishedAt: new Date(),
-            status: 'published',
-            publishedFrom: publishedFrom || null,
-            publishedUntil: publishedUntil ? endOfDay(
-              new Date(publishedUntil),
-            ) : null,
-            updatedAt: new Date()
-          });
-        } else {
-          qb.set({
-            publishedAt: null,
-            status: 'draft',
-            publishedFrom: null,
-            publishedUntil: null,
-            updatedAt: new Date()
-          });
+          const qb = postRepository.createQueryBuilder('post').update(Post);
+          if (publish) {
+            qb.set({
+              publishedAt: new Date(),
+              status: 'published',
+              publishedFrom: publishedFrom || null,
+              publishedUntil: publishedUntil
+                ? endOfDay(new Date(publishedUntil))
+                : null,
+              updatedAt: new Date(),
+            });
+          } else {
+            qb.set({
+              publishedAt: null,
+              status: 'draft',
+              publishedFrom: null,
+              publishedUntil: null,
+              updatedAt: new Date(),
+            });
+          }
+
+          if (recursive) {
+            const all = [];
+            await Promise.all(
+              posts.map(async (post) => {
+                const descendants = await postTreeRepository.findDescendants(
+                  post
+                );
+                descendants.forEach((descendant) => {
+                  all.push(descendant);
+                });
+              })
+            );
+            qb.where('post.id IN (:...ids)', {
+              ids: all.map((post) => post.id),
+            });
+          } else {
+            qb.where('post.id IN (:...ids)', {
+              ids: posts.map((post) => post.id),
+            });
+          }
+
+          await qb.execute();
+          posts = await postRepository.findByIds(ids);
+          return posts;
         }
-
-        if (recursive) {
-          const all = [];
-          await Promise.all(posts.map(async (post) => {
-            const descendants = await postTreeRepository.findDescendants(post);
-            descendants.forEach(descendant => {
-              all.push(descendant);
-            })
-          }));
-          qb.where('post.id IN (:...ids)', { ids: all.map(post => post.id) });
-        } else {
-          qb.where('post.id IN (:...ids)', { ids: posts.map(post => post.id) });
-        }
-
-        await qb.execute();
-        posts = await postRepository.findByIds(ids);
-        return posts;
-      });
+      );
       res.send(result);
     } catch (err) {
       logger.error({
         type: 'post',
         message: 'error saving post',
-        data: err.toString()
+        data: err.toString(),
       });
       throw err;
     }
@@ -488,11 +526,11 @@ app.put(
             'author',
             'author.meta',
             'parent',
-            'tags'
+            'tags',
           ],
           where: {
-            id: req.params.postId
-          }
+            id: req.params.postId,
+          },
         });
         if (!post) throw new BadRequestError('invalid_post');
         if (post?.type === 'post_version')
@@ -534,8 +572,8 @@ app.put(
             where: {
               id: In(
                 req?.body?.tags.map((tag) => tag?.id).filter((id) => !!id)
-              )
-            }
+              ),
+            },
           });
           post.tags = tags;
         }
@@ -551,7 +589,7 @@ app.put(
       logger.error({
         type: 'post',
         message: 'error saving post',
-        data: err.toString()
+        data: err.toString(),
       });
       throw err;
     }
@@ -569,8 +607,8 @@ app.get(
     const post = await postRepository.findOne({
       relations: ['meta', 'contentType', 'author', 'author.meta', 'tags'],
       where: {
-        id: req.params.postId
-      }
+        id: req.params.postId,
+      },
     });
     if (!post) throw new BadRequestError('invalid_post');
     if (versionId) {
@@ -578,8 +616,8 @@ app.get(
         relations: ['meta', 'contentType', 'author', 'author.meta', 'tags'],
         where: {
           id: versionId,
-          parentId: post?.id
-        }
+          parentId: post?.id,
+        },
       });
       if (!postVersion) throw new BadRequestError('invalid_post_version');
       return res.send(
@@ -588,7 +626,7 @@ app.get(
           id: post?.id,
           slug: post?.slug,
           slugPath: post?.slugPath,
-          versionId: postVersion?.id
+          versionId: postVersion?.id,
         })
       );
     }
@@ -618,7 +656,7 @@ app.get(
     if (count) {
       const number = await qb.getCount();
       return res.send({
-        count: number
+        count: number,
       });
     }
 
@@ -656,7 +694,7 @@ app.post(
         .leftJoinAndSelect('post.tags', 'tags')
         .where('post.id = :id', { id: req.params.versionId })
         .andWhere('post.parentId = :parentId', {
-          parentId: req.params.postId
+          parentId: req.params.postId,
         })
         .andWhere('post.type = :type', { type: 'post_version' })
         .getOne();
@@ -690,7 +728,7 @@ app.delete(
     const postRepository = getRepository(Post);
     const deleted = await postRepository.delete({
       id: In(ids),
-      type: 'post_version'
+      type: 'post_version',
     });
 
     return res.send(deleted);
@@ -702,11 +740,11 @@ app.get(
   authMiddleware(),
   asyncMiddleware(async (req, res) => {
     const id = req?.params?.postId;
-    const {versionId} = req?.query;
+    const { versionId } = req?.query;
     const postRepository = getRepository(Post);
     const settingsRepository = getRepository(SiteSettings);
 
-    const where = {id};
+    const where = { id };
     if (versionId) {
       where.id = versionId;
     }
@@ -716,8 +754,8 @@ app.get(
 
     const previewSettings = await settingsRepository.findOne({
       where: {
-        key: 'previewEditor'
-      }
+        key: 'previewEditor',
+      },
     });
 
     if (!previewSettings) throw new BadRequestError('configuration_missing');
@@ -730,27 +768,32 @@ app.get(
     }
 
     return res.send({
-      src: buildPath(post?.slugPath, rewrites as any)
+      src: buildPath(post?.slugPath, rewrites as any),
     });
   })
-)
+);
 
-app.get('/sitemap', asyncMiddleware(async (req, res) => {
-  const postRepository = getEnhancedRepository(Post);
-  const query = postRepository.createQueryBuilder('post');
+app.get(
+  '/search',
+  contentMiddleware({ alwaysAuthorize: true }),
+  asyncMiddleware(async (req, res) => {
+    const postRepository = getEnhancedRepository(Post);
+    const query = postRepository.createQueryBuilder('post');
 
-  publishedQuery(query);
+    publishedQuery(query);
 
-  query.andWhere('post.type IN (:...types)', {
-    types: ['hierarchical_post','post','page']
-  });
+    query.andWhere('post.type IN (:...types)', {
+      types: ['hierarchical_post', 'post', 'page'],
+    });
 
-  const posts = await query.getMany();
-  res.send(posts);
-}))
+    const posts = await query.getMany();
+    res.send(posts);
+  })
+);
 
 app.get(
   '/content/*',
+  contentMiddleware(),
   asyncMiddleware(async (req, res) => {
     let allowUnpublished = req?.query?.allowUnpublished === 'true';
     let versionId = req?.query?.versionId;
@@ -767,10 +810,13 @@ app.get(
 
     const slugPath = (req.params[0] as string).replace(/\/$/, '');
 
-    const post = await retrievePostAndCompile({
-      slugPath,
-      versionId: versionId as string,
-    }, {allowUnpublished, query: req.query});
+    const post = await retrievePostAndCompile(
+      {
+        slugPath,
+        versionId: versionId as string,
+      },
+      { allowUnpublished, query: req.query }
+    );
     res.send(post);
   })
 );
@@ -781,7 +827,7 @@ app.post(
   asyncMiddleware(async (req, res) => {
     const post = {
       ...(req.body || {}),
-      meta: []
+      meta: [],
     };
 
     const flat = flatten(req?.body?.meta || {});
@@ -791,7 +837,7 @@ app.post(
 
       post.meta.push({
         key,
-        value: flat[key]
+        value: flat[key],
       });
     });
 

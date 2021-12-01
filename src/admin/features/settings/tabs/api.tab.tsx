@@ -1,22 +1,29 @@
 import React from 'react';
 import Heading from '@admin/components/heading';
 import { composeWrappers } from '@admin/helpers/hoc';
-import { BackupContextProvider } from '@admin/features/backup/context/backup.context';
-import BackupCommandBar from '@admin/features/backup/components/backup-command-bar';
-import BackupList from '@admin/features/backup/components/backup-list';
+import AccessTokensCommandBar from '@admin/features/api-security/components/access-tokens-command-bar';
+import AccessTokensList from '@admin/features/api-security/components/access-tokens-list';
+import { ApiSecurityContextProvider } from '@admin/features/api-security/context/api-security.context';
+import ApiAccessSettings from '@admin/features/api-security/components/api-access';
 
 const ApiSettings = () => {
   return (
     <div>
-      <Heading title="Access Tokens" noPadding>
-        Generate and delete access tokens which are used
+      <Heading title="API Visibility" noPadding>
+        Using sitemap/search API always requires accessToken
       </Heading>
-      <BackupCommandBar />
-      <BackupList />
+      <ApiAccessSettings />
+
+      <Heading title="Access Tokens" noPadding>
+        Generate and delete access tokens which are used to get posts content
+        and search for posts
+      </Heading>
+      <AccessTokensCommandBar />
+      <AccessTokensList />
     </div>
   );
 };
 
 export default composeWrappers({
-  backupContext: BackupContextProvider,
+  apiSecurityContext: ApiSecurityContextProvider,
 })(ApiSettings);

@@ -1,12 +1,6 @@
 import AceEditor from 'react-ace';
 import { v4 } from 'uuid';
-import {
-  Label,
-  Stack,
-  makeStyles,
-  PrimaryButton,
-  TextField,
-} from '@fluentui/react';
+import { Label, Stack, makeStyles, PrimaryButton } from '@fluentui/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ControlledCheckbox,
@@ -20,9 +14,7 @@ import _ from 'lodash';
 const useStyles = makeStyles((theme) => ({
   editor: {
     width: '100%',
-    borderTop: `1px solid ${theme.palette.neutralLight}`,
-    borderBottom: `1px solid ${theme.palette.neutralLight}`,
-    borderRight: `1px solid ${theme.palette.neutralLight}`,
+    border: `1px solid ${theme.palette.neutralPrimaryAlt}`,
   },
 }));
 
@@ -127,7 +119,7 @@ const PreviewEditorSettings = () => {
       <Stack horizontal horizontalAlign={'end'}>
         <PrimaryButton
           disabled={_.isEqual(values, defaultValues)}
-          onClick={(e) => {
+          onClick={() => {
             handleSubmit((val) => {
               const stringified = JSON.stringify(val);
               updateSettings.execute('previewEditor', stringified);

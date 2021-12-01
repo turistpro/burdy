@@ -8,6 +8,7 @@ import { ModelState, useModelState } from '@admin/helpers/hooks';
 export interface IApiSecurityContext {
   selection: ExtendedSelection<IAccessToken>;
   accessTokensState: ModelState<IAccessToken>;
+  accessTokens: IAccessToken[];
   selectedAccessTokens: IAccessToken[];
   listAccessTokens: UseAsyncReturn<IAccessToken[], []>;
   generateAccessToken: UseAsyncReturn<IAccessToken, [name: string]>;
@@ -48,19 +49,22 @@ const ApiSecurityContextProvider: React.FC<IApiSecurityContextProviderProps> =
     });
 
     const generateAccessToken = useApiCallback(async (name: string) => {
-      const accessToken = await apiAxios.post<any, IAccessToken>(
-        `/access-tokens/generate`,
+      const response = await apiAxios.post(
+        `/access-tokens`,
         {
           name,
         }
       );
-      accessTokensState.create([accessToken]);
+      accessTokensState.create([response?.data]);
+      return response;
     });
 
     const deleteAccessTokens = useApiCallback(async (ids: number[]) => {
-      await apiAxios.delete(`/backups`);
+      const response = await apiAxios.delete(`/access-tokens`, {
+        data: ids
+      });
       accessTokensState.delete(ids);
-      return ids;
+      return response;
     });
 
     return (
@@ -71,6 +75,7 @@ const ApiSecurityContextProvider: React.FC<IApiSecurityContextProviderProps> =
           generateAccessToken,
           selection,
           accessTokensState,
+          accessTokens: accessTokensState.arrayState,
           selectedAccessTokens,
         }}
       >
