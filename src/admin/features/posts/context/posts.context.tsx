@@ -71,8 +71,6 @@ const PostsContextProvider = ({ defaultAdditionalData = {}, children }) => {
     });
   };
 
-  console.log(loadingContent);
-
   const [params, setParams] = useState({});
 
   const [post, setPost] = useState<IPost>(null);
